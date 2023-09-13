@@ -8,15 +8,43 @@ on:
       - '.github/workflows/*'
   workflow_dispatch:
 
+env:
+  AZ_RG_NAME: RG100
+
 
 jobs:
   linter:
     runs-on: ubuntu-latest
-
     steps:
      - name: checkout 
        uses: actions/checkout@v3
      - name: run linter
        run: az bicep build --file ./storage.bicep
+
+  deploy:
+    needs: [linter]
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout 
+        uses: actions/checkout@v3
+      - name: azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZ_CREDS}}
+      - name: create RG
+        uses: azure/cli@v1
+        with:
+          inlineScript:
+            az group create --name ${{env.AZ_RG_NAME}} --location WestEurope
+      - name: deploy sa
+        uses: azure/arm-deploy@v1
+        id: deploy-sa
+        with:
+          scope: resourcegroup
+          deploymentName: ${{github.run_number}}
+          resourceGroupName: ${{env.AZ_RG_NAME}}
+          template: ./storage.bicep
+
+
 
       
