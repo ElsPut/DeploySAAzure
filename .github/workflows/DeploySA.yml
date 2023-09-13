@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZ_RG_NAME: RG100
+  AZ_RG_NAME: RG101
 
 
 jobs:
@@ -44,6 +44,15 @@ jobs:
           deploymentName: ${{github.run_number}}
           resourceGroupName: ${{env.AZ_RG_NAME}}
           template: ./storage.bicep
+      - name: deploy blob
+        uses: azure/arm-deploy@v1
+        id: deploy-blob
+        with:
+            scope: resourcegroup
+            deploymentName: ${{github.run_number}}
+            resourceGroupName: ${{env.AZ_RG_NAME}}
+            template: ./blobcontainer.bicep
+            parameters: mysaname=${{steps.deploy-sa.outputs.mysaname}}
 
 
 
