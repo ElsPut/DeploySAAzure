@@ -8,29 +8,61 @@ on:
       - '.github/workflows/*'
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
-  AZ_RG_NAME: RG101
+  AZ_RG_NAME: RG102
 
 
 jobs:
-  linter:
+  deploy-dev:
     runs-on: ubuntu-latest
-    steps:
-     - name: checkout 
-       uses: actions/checkout@v3
-     - name: run linter
-       run: az bicep build --file ./storage.bicep
-
-  deploy:
-    needs: [linter]
-    runs-on: ubuntu-latest
+    environment: development
     steps:
       - name: checkout 
         uses: actions/checkout@v3
       - name: azure login
         uses: azure/login@v1
         with:
-          creds: ${{secrets.AZ_CREDS}}
+          creds: ${{secrets.AZ_DEV_CREDS}}
+      - name: create RG
+        uses: azure/cli@v1
+        with:
+          inlineScript:
+            az group create --name ${{env.AZ_RG_NAME}} --location WestEurope
+      - name: deploy sa
+        uses: azure/arm-deploy@v1
+        id: deploy-sa
+        with:
+          scope: resourcegroup
+          deploymentName: ${{github.run_number}}
+          resourceGroupName: ${{env.AZ_RG_NAME}}
+          template: ./storage.bicep
+      - name: deploy blob
+        uses: azure/arm-deploy@v1
+        id: deploy-blob
+        with:
+            scope: resourcegroup
+            deploymentName: ${{github.run_number}}
+            resourceGroupName: ${{env.AZ_RG_NAME}}
+            template: ./blobcontainer.bicep
+            parameters: mysaname=${{steps.deploy-sa.outputs.mysaname}}
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: [deploy-dev]
+    environment: production
+    steps:
+      - name: checkout 
+        uses: actions/checkout@v3
+      - name: azure login
+        uses: azure/login@v1
+        with:
+          client-id: ${{secrets.AZ_CLIENT_ID}}
+          tenant-id: ${{secrets.AZ_TENANT_ID}}
+          subscription-id: ${{secrets.AZ_SUB_ID}}
       - name: create RG
         uses: azure/cli@v1
         with:
